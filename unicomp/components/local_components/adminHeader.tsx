@@ -9,6 +9,32 @@ export default function AdminHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // State placeholder untuk menyimpan data user
+  const [userData, setUserData] = useState({
+    name: "Guest",
+    role: "Participant",
+  });
+
+  // Ambil data dari localStorage
+  useEffect(() => {
+    const savedName = localStorage.getItem("userName");
+    const savedRole = localStorage.getItem("userRole");
+
+    if (savedName || savedRole) {
+      setUserData({
+        name: savedName || "Participant",
+        role: savedRole || "",
+      });
+    }
+  }, []);
+
+  // Fungsi untuk menangani Sign Out secara aman lewat client-side
+  const handleSignOut = () => {
+    localStorage.removeItem("token");
+    setIsOpen(false);
+    window.location.href = "/";
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (isOpen && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -48,6 +74,12 @@ export default function AdminHeader() {
 
           {/* Action Icons */}
           <div className="flex items-center gap-4 md:gap-8">
+            {/* Notification Icon */}
+            <Link href="/dashboard/new-notifications" className="text-[#1e40af] hover:text-white transition-colors relative">
+              <Bell size={24} strokeWidth={2} className="md:w-[28px] md:h-[28px]" />
+              <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full border-2 border-[#8cabd9]"></span>
+            </Link>
+
             {/* Profile Dropdown Container */}
             <div className="relative" ref={dropdownRef}>
               <button onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-center text-[#1e40af] hover:text-white transition-all transform active:scale-95 outline-none">
@@ -59,14 +91,14 @@ export default function AdminHeader() {
                 <div className="absolute right-0 mt-4 w-55 bg-white rounded-[2rem] shadow-2xl border border-gray-100 z-[100] overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
                   {/* User Info Section */}
                   <div className="p-6 border-b border-gray-50 bg-gray-50/30">
-                    <div className="font-bold text-gray-800 text-lg">John Doer</div>
-                    <div className="text-xs text-gray-400 mt-0.5 font-medium">john.doer@binus.ac.id</div>
+                    <div className="font-bold text-gray-800 text-lg">{userData.name}</div>
+                    <div className="text-xs text-gray-400 mt-0.5 font-medium">{userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}</div>
                   </div>
 
                   {/* Links Section */}
                   <div className="p-3 space-y-1">
                     <Link
-                      href="/profile"
+                      href="/dashboard/profile"
                       onClick={() => setIsOpen(false)}
                       className="flex items-center gap-4 px-4 py-4 text-sm text-gray-600 hover:bg-gray-50 rounded-2xl transition-colors group font-bold"
                     >
@@ -75,7 +107,7 @@ export default function AdminHeader() {
                     </Link>
 
                     <Link
-                      href="/settings"
+                      href="/dashboard/settings"
                       onClick={() => setIsOpen(false)}
                       className="flex items-center gap-4 px-4 py-4 text-sm text-gray-600 hover:bg-gray-50 rounded-2xl transition-colors group font-bold"
                     >
@@ -86,10 +118,7 @@ export default function AdminHeader() {
                     <div className="h-px bg-gray-100 my-2 mx-4"></div>
 
                     <button
-                      onClick={() => {
-                        console.log("Logout action");
-                        setIsOpen(false);
-                      }}
+                      onClick={handleSignOut}
                       className="w-full flex items-center gap-4 px-4 py-4 text-sm text-red-500 hover:bg-red-50 rounded-2xl transition-colors group font-bold cursor-pointer"
                     >
                       <LogOut size={20} className="text-red-400 group-hover:text-red-600" />
@@ -111,13 +140,13 @@ export default function AdminHeader() {
         {isMobileMenuOpen && (
           <nav className="md:hidden mt-4 pb-6 flex flex-col gap-5 border-t border-[#1e40af]/10 pt-6 animate-in slide-in-from-top duration-300">
             <Link href="/competition" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl">
-              Dashboard
+              Competition
             </Link>
-            <Link href="/calendar" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl">
-              Pending Approval
+            <Link href="/dashboard/calendar" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl">
+              Calendar
             </Link>
             <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl underline underline-offset-8">
-              Active Competition
+              Dashboard
             </Link>
           </nav>
         )}

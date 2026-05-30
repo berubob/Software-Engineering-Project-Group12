@@ -1,18 +1,17 @@
-// app/dashboard/layout.tsx
-import { cookies } from "next/headers";
+"use client";
+import { useState, useEffect } from "react";
 
-export default async function DashboardLayout({
-  children,
-  admin, // Ini merujuk ke folder @admin
-  user, // Ini merujuk ke folder @user
-  organizer,
-}: {
-  children: React.ReactNode;
-  admin: React.ReactNode;
-  user: React.ReactNode;
-  organizer: React.ReactNode;
-}) {
-  const role = (await cookies()).get("user_role")?.value;
+export default function DashboardLayout({ children, admin, user, organizer }: { children: React.ReactNode; admin: React.ReactNode; user: React.ReactNode; organizer: React.ReactNode }) {
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const savedRole = localStorage.getItem("userRole");
+    setRole(savedRole || "participant"); // Jika null, default ke "user"
+  }, []);
+
+  if (role === null) {
+    return <div className="min-h-screen flex items-center justify-center">Loading dashboard...</div>;
+  }
 
   let slotToRender;
 

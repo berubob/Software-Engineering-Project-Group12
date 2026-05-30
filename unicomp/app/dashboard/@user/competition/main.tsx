@@ -22,7 +22,7 @@ interface Competition {
 // Kunci kategori utama yang kita mau tampilkan di tombol
 const FIXED_CATEGORIES = ["All", "Hackathon", "Data Science", "Design", "Cybersecurity", "Others"];
 
-export default function CompetitionHubMain() {
+export default function Main() {
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [filteredCompetitions, setFilteredCompetitions] = useState<Competition[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -45,7 +45,7 @@ export default function CompetitionHubMain() {
     const fetchCompetitions = async () => {
       try {
         setLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL || "http://localhost:3001";
+        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
 
         const response = await fetch(`${apiUrl}/competitions`, {
           method: "GET",
@@ -171,7 +171,7 @@ export default function CompetitionHubMain() {
                   </div>
 
                   <Link
-                    href={`/competition/${comp.competition_id}`}
+                    href={`/dashboard/competition/${comp.competition_id}`}
                     className="mt-6 w-full text-center bg-[#8cabd9] hover:bg-[#365D92] text-white py-3 rounded-xl font-bold text-sm shadow-sm block transition-colors cursor-pointer"
                   >
                     View Detail

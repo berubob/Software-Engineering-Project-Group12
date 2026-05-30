@@ -49,7 +49,7 @@ export default function LoginPage() {
         if (result.token) {
           localStorage.setItem("token", result.token);
           localStorage.setItem("userName", result.user.name);
-          localStorage.setItem("userEmail", result.user.email);
+          localStorage.setItem("userRole", result.user.role);
         }
 
         alert("Login Berhasil!");

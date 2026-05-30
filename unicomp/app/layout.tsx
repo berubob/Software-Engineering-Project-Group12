@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "UniComp",
   description: "Website Kalender Perlombaan",
+  icons: {
+    icon: "/UniComp Logo.svg",
+  },
 };
 
 export default function RootLayout({

@@ -4,7 +4,7 @@ import Footer from "@/components/global_components/footer";
 import Link from "next/link";
 import Main from "./main";
 
-const Dashboard = () => {
+export default function MyRegistration() {
   return (
     <>
       <UserHeader />
@@ -12,6 +12,4 @@ const Dashboard = () => {
       <Footer />
     </>
   );
-};
-
-export default Dashboard;
+}

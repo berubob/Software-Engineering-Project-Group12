@@ -2,30 +2,61 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { UserCircle, Settings, LogOut, User, Bell, Menu, X } from "lucide-react";
+import { UserCircle, LogOut, Bell, Menu, X, Settings } from "lucide-react";
 
 export default function UserHeader() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // State untuk data notifikasi khusus di header
+  const [hasUnread, setHasUnread] = useState<boolean>(false);
+
   // State placeholder untuk menyimpan data user
   const [userData, setUserData] = useState({
     name: "Guest",
-    email: "guest@unicomp.com",
+    role: "Participant",
   });
 
-  // Ambil data dari localStorage
+  // Ambil data user dari localStorage & fetch notifikasi unread
   useEffect(() => {
     const savedName = localStorage.getItem("userName");
-    const savedEmail = localStorage.getItem("userEmail");
+    const savedRole = localStorage.getItem("userRole");
 
-    if (savedName || savedEmail) {
+    if (savedName || savedRole) {
       setUserData({
         name: savedName || "Participant",
-        email: savedEmail || "",
+        role: savedRole || "",
       });
     }
+
+    const checkUnreadNotifications = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const token = localStorage.getItem("token");
+
+        const res = await fetch(`${apiUrl}/notifications/me`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            // Cek jika ada minimal satu notifikasi yang belum dibaca
+            const unreadExist = data.some((n: any) => n.is_read === false || n.status === "unread" || !n.is_read);
+            setHasUnread(unreadExist);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching header notifications:", error);
+      }
+    };
+
+    checkUnreadNotifications();
   }, []);
 
   // Fungsi untuk menangani Sign Out secara aman lewat client-side
@@ -70,14 +101,19 @@ export default function UserHeader() {
             <Link href="/dashboard" className="hover:text-white transition-colors">
               Dashboard
             </Link>
+            <Link href="/dashboard/leaderboard" className="hover:text-white transition-colors">
+              Leaderboard
+            </Link>
           </nav>
 
           {/* Action Icons */}
           <div className="flex items-center gap-4 md:gap-8">
             {/* Notification Icon */}
-            <Link href="/dashboard/new-notifications" className="text-[#1e40af] hover:text-white transition-colors relative">
+            <Link href="/dashboard/notifications" className="text-[#1e40af] hover:text-white transition-colors relative">
               <Bell size={24} strokeWidth={2} className="md:w-[28px] md:h-[28px]" />
-              <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full border-2 border-[#8cabd9]"></span>
+
+              {/* TANDA MERAH AKTIF JIKA ADA UNREAD */}
+              {hasUnread && <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full border-2 border-[#8cabd9] animate-pulse"></span>}
             </Link>
 
             {/* Profile Dropdown Container */}
@@ -92,7 +128,7 @@ export default function UserHeader() {
                   {/* User Info Section */}
                   <div className="p-6 border-b border-gray-50 bg-gray-50/30">
                     <div className="font-bold text-gray-800 text-lg">{userData.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5 font-medium">{userData.email}</div>
+                    <div className="text-xs text-gray-400 mt-0.5 font-medium">{userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}</div>
                   </div>
 
                   {/* Links Section */}
@@ -105,7 +141,6 @@ export default function UserHeader() {
                       <UserCircle size={20} className="text-gray-400 group-hover:text-[#1e40af]" />
                       <span>My Profile</span>
                     </Link>
-
                     <Link
                       href="/dashboard/settings"
                       onClick={() => setIsOpen(false)}
@@ -139,14 +174,17 @@ export default function UserHeader() {
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
           <nav className="md:hidden mt-4 pb-6 flex flex-col gap-5 border-t border-[#1e40af]/10 pt-6 animate-in slide-in-from-top duration-300">
-            <Link href="/competition" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl">
+            <Link href="/dashboard/competition" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl">
               Competition
             </Link>
             <Link href="/dashboard/calendar" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl">
               Calendar
             </Link>
-            <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl underline underline-offset-8">
+            <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl">
               Dashboard
+            </Link>
+            <Link href="/dashboard/leaderboard" onClick={() => setIsMobileMenuOpen(false)} className="text-[#1e40af] font-bold hover:text-white text-xl underline underline-offset-8">
+              Leaderboard
             </Link>
           </nav>
         )}
