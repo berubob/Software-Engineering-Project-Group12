@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { UserCircle, Settings, LogOut, User, Bell, Menu, X } from "lucide-react";
+import { UserCircle, LogOut, User, Bell, Menu, X } from "lucide-react";
 
 export default function OrganizerHeader() {
   const [isOpen, setIsOpen] = useState(false);
@@ -101,15 +101,6 @@ export default function OrganizerHeader() {
                     >
                       <UserCircle size={20} className="text-gray-400 group-hover:text-[#1e40af]" />
                       <span>My Profile</span>
-                    </Link>
-
-                    <Link
-                      href="/dashboard/settings"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center gap-4 px-4 py-4 text-sm text-gray-600 hover:bg-gray-50 rounded-2xl transition-colors group font-bold"
-                    >
-                      <Settings size={20} className="text-gray-400 group-hover:text-[#1e40af]" />
-                      <span>Account Settings</span>
                     </Link>
 
                     <div className="h-px bg-gray-100 my-2 mx-4"></div>

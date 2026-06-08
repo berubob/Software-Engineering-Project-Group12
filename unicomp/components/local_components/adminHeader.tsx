@@ -2,11 +2,12 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { UserCircle, Settings, LogOut, User, Bell, Menu, X } from "lucide-react";
+import { UserCircle, LogOut, User, Bell, Menu, X } from "lucide-react";
 
 export default function AdminHeader() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasUnread, setHasUnread] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // State placeholder untuk menyimpan data user
@@ -15,10 +16,13 @@ export default function AdminHeader() {
     role: "Participant",
   });
 
-  // Ambil data dari localStorage
+  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+
+  // 1. Ambil data user dari localStorage & Cek Notifikasi
   useEffect(() => {
     const savedName = localStorage.getItem("userName");
     const savedRole = localStorage.getItem("userRole");
+    const token = localStorage.getItem("token");
 
     if (savedName || savedRole) {
       setUserData({
@@ -26,7 +30,35 @@ export default function AdminHeader() {
         role: savedRole || "",
       });
     }
-  }, []);
+
+    // Fungsi untuk mengecek notifikasi masuk
+    const checkNotifications = async () => {
+      if (!token || !apiUrl) return;
+
+      try {
+        const res = await fetch(`${apiUrl}/notifications/me`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+
+          // Asumsi mendasar: Data berupa Array of Objects.
+          // Menyesuaikan properti check: 'is_read === false' atau '!item.is_read'
+          const unreadExists = data.some((notif: any) => notif.is_read === false || notif.read === false);
+          setHasUnread(unreadExists);
+        }
+      } catch (err) {
+        console.error("Error fetching notifications:", err);
+      }
+    };
+
+    checkNotifications();
+  }, [apiUrl]);
 
   // Fungsi untuk menangani Sign Out secara aman lewat client-side
   const handleSignOut = () => {
@@ -75,9 +107,10 @@ export default function AdminHeader() {
           {/* Action Icons */}
           <div className="flex items-center gap-4 md:gap-8">
             {/* Notification Icon */}
-            <Link href="/dashboard/new-notifications" className="text-[#1e40af] hover:text-white transition-colors relative">
+            <Link href="/dashboard/notifications" className="text-[#1e40af] hover:text-white transition-colors relative">
               <Bell size={24} strokeWidth={2} className="md:w-[28px] md:h-[28px]" />
-              <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full border-2 border-[#8cabd9]"></span>
+              {/* Tanda merah bersyarat (Hanya muncul jika hasUnread bernilai true) */}
+              {hasUnread && <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full border-2 border-[#8cabd9]"></span>}
             </Link>
 
             {/* Profile Dropdown Container */}
@@ -92,7 +125,7 @@ export default function AdminHeader() {
                   {/* User Info Section */}
                   <div className="p-6 border-b border-gray-50 bg-gray-50/30">
                     <div className="font-bold text-gray-800 text-lg">{userData.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5 font-medium">{userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}</div>
+                    <div className="text-xs text-gray-400 mt-0.5 font-medium">{userData.role ? userData.role.charAt(0).toUpperCase() + userData.role.slice(1) : ""}</div>
                   </div>
 
                   {/* Links Section */}
@@ -104,15 +137,6 @@ export default function AdminHeader() {
                     >
                       <UserCircle size={20} className="text-gray-400 group-hover:text-[#1e40af]" />
                       <span>My Profile</span>
-                    </Link>
-
-                    <Link
-                      href="/dashboard/settings"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center gap-4 px-4 py-4 text-sm text-gray-600 hover:bg-gray-50 rounded-2xl transition-colors group font-bold"
-                    >
-                      <Settings size={20} className="text-gray-400 group-hover:text-[#1e40af]" />
-                      <span>Account Settings</span>
                     </Link>
 
                     <div className="h-px bg-gray-100 my-2 mx-4"></div>

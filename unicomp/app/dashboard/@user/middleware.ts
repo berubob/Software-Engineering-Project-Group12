@@ -9,18 +9,30 @@ export interface CompetitionRegistration {
   deadline: string | null;
 }
 
+export interface CompetitionResultItem {
+  competition_id: number;
+  competition_title: string;
+  rank: number;
+  score?: number | string;
+}
+
 export function useDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [registrations, setRegistrations] = useState<CompetitionRegistration[]>([]);
+  const [competitionResults, setCompetitionResults] = useState<CompetitionResultItem[]>([]);
+
   const [loadingNotif, setLoadingNotif] = useState<boolean>(true);
   const [loadingReg, setLoadingReg] = useState<boolean>(true);
+  const [loadingResults, setLoadingResults] = useState<boolean>(true);
+
   const [activeCount, setActiveCount] = useState<number>(0);
   const [deadlineCount, setDeadlineCount] = useState<number>(0);
+
+  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
 
   const fetchNotifications = async () => {
     try {
       setLoadingNotif(true);
-      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${apiUrl}/notifications/me`, {
@@ -37,14 +49,134 @@ export function useDashboard() {
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {
+      // <-- PERBAIKAN: Diubah dari 'filey' menjadi 'finally'
       setLoadingNotif(false);
+    }
+  };
+
+  const fetchResultsData = async () => {
+    try {
+      setLoadingResults(true);
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const resUser = await fetch(`${apiUrl}/users/me`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!resUser.ok) throw new Error("Gagal mengambil data profil.");
+      const userData = await resUser.json();
+      const currentUserId = userData.user_id;
+
+      if (!userData.total_wins || Object.keys(userData.total_wins).length === 0) {
+        setCompetitionResults([]);
+        return;
+      }
+
+      const allIds: number[] = [];
+      Object.values(userData.total_wins).forEach((category: any) => {
+        if (category.competition_ids && Array.isArray(category.competition_ids)) {
+          allIds.push(...category.competition_ids);
+        }
+      });
+
+      if (allIds.length === 0) return;
+      const uniqueIds = Array.from(new Set(allIds));
+
+      const detailedPromises = uniqueIds.map(async (id): Promise<CompetitionResultItem | null> => {
+        try {
+          const headers = {
+            "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
+          };
+
+          const [resResult, resComp] = await Promise.all([fetch(`${apiUrl}/results/${id}`, { method: "GET", headers }), fetch(`${apiUrl}/competitions/${id}`, { method: "GET", headers })]);
+
+          const resultPayload = resResult.ok ? await resResult.json() : null;
+          const compData = resComp.ok ? await resComp.json() : null;
+
+          let userRank = 0;
+          let userScore: number | string | undefined = undefined;
+
+          if (resultPayload) {
+            const actualResults = Array.isArray(resultPayload) ? resultPayload : resultPayload.data && Array.isArray(resultPayload.data) ? resultPayload.data : [resultPayload];
+
+            let targetData = actualResults.find((item: any) => {
+              if (!item) return false;
+              const itemUserId = item.user_id !== undefined ? item.user_id : item.userId;
+              return String(itemUserId) === String(currentUserId);
+            });
+
+            if (!targetData) {
+              targetData = actualResults.find((item: any) => {
+                if (item && Array.isArray(item.rank)) {
+                  return item.rank.some((r: any) => {
+                    const rUserId = r.user_id !== undefined ? r.user_id : r.userId;
+                    return String(rUserId) === String(currentUserId);
+                  });
+                }
+                return false;
+              });
+            }
+
+            if (targetData) {
+              userScore = targetData.score ?? undefined;
+              if (targetData.rank !== undefined && targetData.rank !== null) {
+                if (Array.isArray(targetData.rank)) {
+                  const innerRankObj = targetData.rank.find((r: any) => {
+                    const rUserId = r.user_id !== undefined ? r.user_id : r.userId;
+                    return String(rUserId) === String(currentUserId);
+                  });
+                  if (innerRankObj) userRank = Number(innerRankObj.rank);
+                } else if (typeof targetData.rank === "object") {
+                  userRank = targetData.rank.rank !== undefined ? Number(targetData.rank.rank) : 0;
+                } else {
+                  userRank = Number(targetData.rank);
+                }
+              }
+            }
+          }
+
+          if (userRank === 0) {
+            for (const categoryData of Object.values(userData.total_wins) as any[]) {
+              if (categoryData.competition_ids?.includes(id)) {
+                userRank = 2;
+                break;
+              }
+            }
+          }
+
+          return {
+            competition_id: id,
+            competition_title: compData?.title || compData?.name || `Competition #${id}`,
+            rank: userRank,
+            ...(userScore !== undefined && { score: userScore }),
+          };
+        } catch (err) {
+          console.error(`Gagal memuat detail kompetisi ID: ${id}`, err);
+          return null;
+        }
+      });
+
+      const resolvedResults = await Promise.all(detailedPromises);
+      const cleanResults = resolvedResults.filter((r): r is CompetitionResultItem => {
+        return r !== null && r !== undefined && typeof r.competition_title === "string";
+      });
+
+      setCompetitionResults(cleanResults);
+    } catch (error) {
+      console.error("Error fetching detailed competition metrics on dashboard:", error);
+    } finally {
+      setLoadingResults(false);
     }
   };
 
   const fetchRegistrations = async () => {
     try {
       setLoadingReg(true);
-      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${apiUrl}/registrations/me`, {
@@ -60,7 +192,6 @@ export function useDashboard() {
 
       const mappedRegs = Array.isArray(data)
         ? data.map((item: any) => {
-            // Memformat tampilan tanggal untuk UI (Contoh hasil: "End: 2026-06-05")
             const displayDate = item.end_date ? `End: ${new Date(item.end_date).toISOString().split("T")[0]}` : "Date not available";
 
             return {
@@ -75,11 +206,9 @@ export function useDashboard() {
 
       setRegistrations(mappedRegs);
 
-      // --- LOGIKA UTAMA FILTER WAKTU (DENGAN DATA ASLI API) ---
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Batas H+7 dari hari ini
       const sevenDaysFromNow = new Date(today);
       sevenDaysFromNow.setDate(today.getDate() + 7);
 
@@ -87,7 +216,6 @@ export function useDashboard() {
       let upcoming = 0;
 
       mappedRegs.forEach((comp) => {
-        // 1. Hitung Kompetisi Aktif berdasarkan 'endDate' yang belum terlewat
         if (comp.endDate) {
           const compEndDate = new Date(comp.endDate);
           compEndDate.setHours(0, 0, 0, 0);
@@ -96,18 +224,15 @@ export function useDashboard() {
             active++;
           }
         } else {
-          // Jika tidak ada endDate dari backend, default dianggap aktif
           active++;
         }
 
-        // 2. Hitung Upcoming Deadlines berdasarkan 'deadline' atau 'endDate' (H-7)
         const targetTargetDate = comp.deadline || comp.endDate;
 
         if (targetTargetDate) {
           const compDeadlineDate = new Date(targetTargetDate);
           compDeadlineDate.setHours(0, 0, 0, 0);
 
-          // Masuk kategori upcoming jika deadline-nya antara hari ini sampai 7 hari ke depan
           if (compDeadlineDate >= today && compDeadlineDate <= sevenDaysFromNow) {
             upcoming++;
           }
@@ -116,7 +241,6 @@ export function useDashboard() {
 
       setActiveCount(active);
       setDeadlineCount(upcoming);
-      // --------------------------------------------------------
     } catch (error) {
       console.error("Error fetching registrations:", error);
     } finally {
@@ -125,9 +249,12 @@ export function useDashboard() {
   };
 
   useEffect(() => {
-    fetchNotifications();
-    fetchRegistrations();
-  }, []);
+    if (apiUrl) {
+      fetchNotifications();
+      fetchRegistrations();
+      fetchResultsData();
+    }
+  }, [apiUrl]);
 
   const stats = [
     {
@@ -156,6 +283,8 @@ export function useDashboard() {
   return {
     stats,
     registrations,
+    competitionResults,
     loadingReg,
+    loadingResults,
   };
 }

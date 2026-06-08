@@ -3,9 +3,10 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useDashboard } from "./middleware";
+import { Trophy, Loader2 } from "lucide-react";
 
 export default function Main() {
-  const { stats, registrations, loadingReg } = useDashboard();
+  const { stats, registrations, competitionResults, loadingReg, loadingResults } = useDashboard();
 
   return (
     <div className="bg-[#f8f9fa] min-h-screen px-6 py-10 md:px-20">
@@ -57,7 +58,7 @@ export default function Main() {
               {registrations.map((reg, i) => (
                 <Link
                   key={i}
-                  href={`/dashboard/my-registration/${reg.id}`}
+                  href={`/dashboard/competition/${reg.id}`}
                   className="flex justify-between items-center border-b border-gray-50 pb-4 last:border-0 hover:bg-gray-50/50 transition-colors cursor-pointer px-2 -mx-2 rounded-lg block"
                 >
                   <div>
@@ -83,12 +84,50 @@ export default function Main() {
               View All
             </Link>
           </div>
-          <div className="flex-1 flex flex-col items-center justify-center py-10">
-            <div className="bg-gray-50 p-4 rounded-full mb-3">
-              <Image src="/Trophy.svg" width={20} height={20} alt="empty" className="opacity-100 grayscale brightness-120" />
+
+          {loadingResults ? (
+            <div className="flex-1 flex items-center justify-center gap-2 text-sm text-gray-400 font-medium">
+              <Loader2 size={16} className="animate-spin text-blue-600" />
+              <span>Loading metrics history...</span>
             </div>
-            <div className="text-gray-400 text-xs italic">No result published yet</div>
-          </div>
+          ) : competitionResults.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-10">
+              <div className="bg-gray-50 p-4 rounded-full mb-3">
+                <Image src="/Trophy.svg" width={20} height={20} alt="empty" className="opacity-100 grayscale brightness-120" />
+              </div>
+              <div className="text-gray-400 text-xs italic">No result published yet</div>
+            </div>
+          ) : (
+            /* PERBAIKAN: Menambahkan arbitrary class Tailwind untuk menyembunyikan scrollbar baris di bawah ini.
+               Serta menghapus `pr-1` agar padding kanan simetris kembali setelah scrollbar menghilang.
+            */
+            <div className="space-y-4 max-h-[320px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&-::-webkit-scrollbar]:none">
+              {competitionResults.map((result, idx) => (
+                <div key={idx} className="flex justify-between items-center border-b border-gray-50 pb-4 last:border-0 hover:bg-gray-50/50 transition-colors px-2 -mx-2 rounded-lg">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`p-2 rounded-lg flex-shrink-0 ${result.rank === 1 ? "bg-amber-50 text-amber-500" : result.rank === 2 ? "bg-slate-100 text-slate-500" : "bg-blue-50 text-blue-500"}`}
+                    >
+                      <Trophy size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-gray-800 truncate">{result.competition_title}</div>
+                      {result.score !== undefined && (
+                        <div className="text-[10px] text-gray-400 mt-0.5">
+                          Score: <span className="font-semibold text-gray-600">{result.score}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md flex-shrink-0 ${result.rank === 1 ? "bg-amber-500 text-white" : result.rank === 2 ? "bg-slate-400 text-white" : "bg-gray-200 text-gray-600"}`}
+                  >
+                    {result.rank > 0 ? `Rank ${result.rank}` : "Participant"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

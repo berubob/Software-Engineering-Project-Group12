@@ -41,23 +41,16 @@ export default function Main() {
       try {
         setLoading(true);
         setErrorMessage(null);
-
-        // 1. Ambil JWT token dari localStorage
         const token = localStorage.getItem("token");
 
-        // 2. Setup Headers
         const headers: HeadersInit = {
           "Content-Type": "application/json",
         };
 
-        // 3. Sisipkan token jika tersedia
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
-        } else {
-          console.warn("JWT Token tidak ditemukan di localStorage!");
         }
 
-        // 4. Hit langsung ke endpoint Railway API
         const response = await fetch(`${RAILWAY_API_URL}/registrations/me`, {
           method: "GET",
           headers: headers,
@@ -68,10 +61,8 @@ export default function Main() {
           setEventsData(data);
         } else if (response.status === 401) {
           setErrorMessage("Unauthorized. Sesi kamu habis, silakan login kembali.");
-          console.error("Token invalid atau kedaluwarsa.");
         } else {
           setErrorMessage("Gagal memuat data kompetisi dari server.");
-          console.error("Failed to fetch registrations data:", response.statusText);
         }
       } catch (error) {
         setErrorMessage("Terjadi kesalahan jaringan saat menghubungi server.");
@@ -84,10 +75,18 @@ export default function Main() {
     fetchRegistrations();
   }, [RAILWAY_API_URL]);
 
-  // --- HELPER UNTUK EKSTRAKSI STRING TANGGAL (YYYY-MM-DD) ---
+  // --- UTILITY: Ekstraksi String tanggal yang aman & support case-insensitive 't' / 'T' ---
   const getIsoDateString = (isoString: string | null) => {
     if (!isoString) return "";
-    return isoString.split("T")[0];
+    return isoString.toLowerCase().split("t")[0];
+  };
+
+  // --- UTILITY: Format objek Date menjadi string YYYY-MM-DD berbasis waktu lokal ---
+  const formatLocalYYYYMMDD = (dateObj: Date) => {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
   // --- LOGIKA GENERATE GRID KALENDER ---
@@ -100,16 +99,17 @@ export default function Main() {
 
     const datesArray: CalendarDate[] = [];
     const today = new Date();
+    const todayStr = formatLocalYYYYMMDD(today);
 
     // 1. Tanggal dari Bulan Sebelumnya
     for (let i = firstDayIndex - 1; i >= 0; i--) {
       const prevMonthDate = new Date(year, month, -i);
-      const dateStr = prevMonthDate.toISOString().split("T")[0];
+      const dateStr = formatLocalYYYYMMDD(prevMonthDate);
 
       datesArray.push({
         date: prevMonthDate.getDate(),
         currentMonth: false,
-        isToday: false,
+        isToday: dateStr === todayStr,
         isRed: eventsData.some((e) => getIsoDateString(e.deadline) === dateStr),
         isGreen: eventsData.some((e) => getIsoDateString(e.registration_date) === dateStr),
         fullDateString: dateStr,
@@ -119,16 +119,12 @@ export default function Main() {
     // 2. Tanggal Bulan Berjalan (Current Month)
     for (let i = 1; i <= totalDaysInMonth; i++) {
       const activeDate = new Date(year, month, i);
-      const offset = activeDate.getTimezoneOffset();
-      const localActiveDate = new Date(activeDate.getTime() - offset * 60 * 1000);
-      const dateStr = localActiveDate.toISOString().split("T")[0];
-
-      const checkToday = today.getDate() === i && today.getMonth() === month && today.getFullYear() === year;
+      const dateStr = formatLocalYYYYMMDD(activeDate);
 
       datesArray.push({
         date: i,
         currentMonth: true,
-        isToday: checkToday,
+        isToday: dateStr === todayStr,
         isRed: eventsData.some((e) => getIsoDateString(e.deadline) === dateStr),
         isGreen: eventsData.some((e) => getIsoDateString(e.registration_date) === dateStr),
         fullDateString: dateStr,
@@ -139,12 +135,12 @@ export default function Main() {
     const remainingSlots = 42 - datesArray.length;
     for (let i = 1; i <= remainingSlots; i++) {
       const nextMonthDate = new Date(year, month + 1, i);
-      const dateStr = nextMonthDate.toISOString().split("T")[0];
+      const dateStr = formatLocalYYYYMMDD(nextMonthDate);
 
       datesArray.push({
         date: i,
         currentMonth: false,
-        isToday: false,
+        isToday: dateStr === todayStr,
         isRed: eventsData.some((e) => getIsoDateString(e.deadline) === dateStr),
         isGreen: eventsData.some((e) => getIsoDateString(e.registration_date) === dateStr),
         fullDateString: dateStr,
@@ -245,15 +241,24 @@ export default function Main() {
             <div className="text-center py-12 text-gray-400 font-medium text-sm bg-white border border-gray-100 rounded-[1.5rem] p-6 shadow-sm">No competition timeline this month.</div>
           ) : (
             filteredEvents.map((event, idx) => {
-              const deadlineDay = event.deadline.split("T")[0].split("-")[2];
-              const regDay = event.registration_date.split("T")[0].split("-")[2];
+              const deadlineDateObj = new Date(event.deadline);
+              const regDateObj = new Date(event.registration_date);
+
+              const deadlineDay = deadlineDateObj.getDate();
+              const regDay = regDateObj.getDate();
+
+              const deadlineMonthStr = deadlineDateObj.toLocaleDateString("en-US", { month: "short" });
+              const regMonthStr = regDateObj.toLocaleDateString("en-US", { month: "short" });
 
               return (
                 <div key={idx} className="space-y-4">
                   {/* Card 1: Bagian Deadline (Merah) */}
                   <div className="bg-[#ff5f5f] rounded-[1.5rem] p-6 text-white shadow-md transform hover:scale-[1.01] transition-transform">
                     <div className="flex justify-between items-start mb-4">
-                      <span className="text-4xl font-bold">{deadlineDay}</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-4xl font-bold text-white">{deadlineDay}</span>
+                        <span className="text-xl font-medium text-white">{deadlineMonthStr}</span>
+                      </div>
                       <span className="text-xs font-bold bg-white/20 px-2.5 py-1 rounded-full uppercase tracking-wider">{event.competition_type}</span>
                     </div>
                     <h3 className="font-bold text-sm mb-1 tracking-wide uppercase">{event.title}</h3>
@@ -263,7 +268,10 @@ export default function Main() {
                   {/* Card 2: Bagian Registration Date (Hijau) */}
                   <div className="bg-[#2ade5d] rounded-[1.5rem] p-6 text-white shadow-md transform hover:scale-[1.01] transition-transform">
                     <div className="flex justify-between items-start mb-4">
-                      <span className="text-4xl font-bold">{regDay}</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-4xl font-bold text-white">{regDay}</span>
+                        <span className="text-xl font-medium text-white">{regMonthStr}</span>
+                      </div>
                       <span className="text-xs font-bold bg-black/10 px-2.5 py-1 rounded-full uppercase tracking-wider text-emerald-900">{event.status}</span>
                     </div>
                     <h3 className="font-bold text-sm mb-1 tracking-wide uppercase">{event.title}</h3>

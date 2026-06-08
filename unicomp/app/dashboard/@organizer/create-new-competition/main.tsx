@@ -1,41 +1,191 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { ArrowLeft, Calendar, Clock, DollarSign, Users, Link as LinkIcon, Image as ImageIcon, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, DollarSign, Link as LinkIcon, Layers, Plus, Loader2, X, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+interface ScheduleItem {
+  event: string;
+  date: string;
+}
 
 export default function Main() {
   const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+  const [targetDraftId, setTargetDraftId] = useState<string | null>(null);
 
-  // State untuk menangani dynamic list (Rules & Schedule)
+  // State Manajemen Form Terkontrol
+  const [formData, setFormData] = useState({
+    title: "",
+    category: "",
+    description: "",
+    startDate: "",
+    endDate: "",
+    prize: "",
+    competitionType: "Online",
+    registrationLink: "",
+  });
+
+  // State Dinamis untuk Rules & Guidelines
   const [rules, setRules] = useState<string[]>([""]);
-  const [schedules, setSchedules] = useState<{ activity: string; time: string; date: string }[]>([{ activity: "", time: "", date: "" }]);
 
-  // Handler menambah baris Rules
+  // State Dinamis untuk Timeline Schedule
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([{ event: "", date: "" }]);
+
+  // Dropdown Options
+  const categories = ["Hackathon", "Data Science", "Design", "Cybersecurity", "Technology", "Others"];
+  const competitionTypes = ["Online", "Onsite", "Hybrid"];
+
+  // EFFECT UNTUK MENANGKAP DATA DRAFT DARI SESSIONSTORAGE
+  useEffect(() => {
+    const savedDraftString = sessionStorage.getItem("selected_draft_data");
+
+    if (savedDraftString) {
+      try {
+        const parsedDraft = JSON.parse(savedDraftString);
+        setIsEditMode(true);
+        setTargetDraftId(parsedDraft.competition_id);
+
+        // 1. Ambil data teks/string biasa
+        setFormData({
+          title: parsedDraft.title || "",
+          category: parsedDraft.category || "",
+          description: parsedDraft.description || "",
+          // Format ISO (2026-06-08T00:00:00.000Z) dipotong menjadi HTML date string (2026-06-08)
+          startDate: parsedDraft.start_date ? parsedDraft.start_date.split("T")[0] : "",
+          endDate: parsedDraft.end_date ? parsedDraft.end_date.split("T")[0] : "",
+          prize: parsedDraft.prize || "",
+          competitionType: parsedDraft.competition_type || "Online",
+          registrationLink: parsedDraft.registration_link || "",
+        });
+
+        // 2. Membalikkan gabungan string ". " aturan kembali menjadi bentuk Array
+        if (parsedDraft.rules_condition) {
+          const splitRules = parsedDraft.rules_condition.split(". ").filter((r: string) => r.trim() !== "");
+          setRules(splitRules.length > 0 ? splitRules : [""]);
+        }
+
+        // 3. Membalikkan skema Record<string, string> schedule backend menjadi Array [{event, date}]
+        if (parsedDraft.schedule && typeof parsedDraft.schedule === "object") {
+          const convertedSchedules = Object.entries(parsedDraft.schedule).map(([event, date]) => ({
+            event,
+            date: typeof date === "string" ? date.split("T")[0] : "",
+          }));
+          setSchedules(convertedSchedules.length > 0 ? convertedSchedules : [{ event: "", date: "" }]);
+        }
+      } catch (err) {
+        console.error("Gagal mem-parsing data koordinat draft:", err);
+      } finally {
+        // Hapus jejak session memori agar form bersih kembali saat diakses manual nanti
+        sessionStorage.removeItem("selected_draft_data");
+      }
+    }
+  }, []);
+
+  // Handler Perubahan Nilai Input Biasa & Select Dropdown
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Handler Rules
   const addRule = () => setRules([...rules, ""]);
   const handleRuleChange = (index: number, value: string) => {
     const newRules = [...rules];
     newRules[index] = value;
     setRules(newRules);
   };
+  const removeRule = (index: number) => {
+    if (rules.length > 1) {
+      setRules(rules.filter((_, idx) => idx !== index));
+    } else {
+      setRules([""]);
+    }
+  };
 
-  // Handler menambah baris Schedule
-  const addSchedule = () => setSchedules([...schedules, { activity: "", time: "", date: "" }]);
-  const handleScheduleChange = (index: number, field: string, value: string) => {
-    const newSchedules = [...schedules] as any;
+  // Handler Schedules
+  const addSchedule = () => setSchedules([...schedules, { event: "", date: "" }]);
+  const handleScheduleChange = (index: number, field: keyof ScheduleItem, value: string) => {
+    const newSchedules = [...schedules];
     newSchedules[index][field] = value;
     setSchedules(newSchedules);
+  };
+  const removeSchedule = (index: number) => {
+    if (schedules.length > 1) {
+      setSchedules(schedules.filter((_, idx) => idx !== index));
+    } else {
+      setSchedules([{ event: "", date: "" }]);
+    }
+  };
+
+  // Main Submit Handler untuk POST / PUT data ke API
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, isDraftMode: boolean = false) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      const token = localStorage.getItem("token");
+      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+
+      const apiScheduleObject: Record<string, string> = {};
+      schedules.forEach((item) => {
+        if (item.event.trim() && item.date) {
+          apiScheduleObject[item.event.trim()] = item.date;
+        }
+      });
+
+      const registrationClosedItem = schedules.find((s) => s.event.toLowerCase().includes("closed") || s.event.toLowerCase().includes("deadline"));
+      const calculatedDeadline = registrationClosedItem ? registrationClosedItem.date : formData.endDate;
+
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        competition_type: formData.competitionType,
+        schedule: apiScheduleObject,
+        rules_condition: rules.filter((r) => r.trim() !== "").join(". "),
+        deadline: calculatedDeadline,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+        registration_link: formData.registrationLink,
+        prize: formData.prize,
+      };
+
+      // Jika dalam mode edit draft, Anda bisa mengubah method menjadi PUT/PATCH sesuai endpoint backend Anda
+      const targetUrl = isEditMode ? `${apiUrl}/competitions/${targetDraftId}` : `${apiUrl}/competitions`;
+      const targetMethod = isEditMode ? "PUT" : "POST";
+
+      const res = await fetch(targetUrl, {
+        method: targetMethod,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Gagal menyimpan data kompetisi ke server.");
+      }
+
+      alert(isDraftMode ? "Berhasil menyimpan perubahan draft!" : isEditMode ? "Kompetisi berhasil diperbarui!" : "Kompetisi berhasil dibuat!");
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Terjadi kesalahan internal backend.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="relative min-h-screen bg-[#f8f9fa] w-full overflow-x-hidden">
-      {/* BACKGROUND IMAGE OVERLAY */}
       <div className="absolute inset-0 w-full h-full opacity-5 pointer-events-none -z-10">
         <Image src="/NetworkBG.svg" alt="Create Competition Background" fill className="object-cover object-center" priority />
       </div>
 
       <main className="max-w-4xl w-full mx-auto px-6 md:px-12 py-10 font-sans">
-        {/* Tombol Back Lingkaran Putih */}
         <button
           onClick={() => router.back()}
           type="button"
@@ -44,50 +194,73 @@ export default function Main() {
           <ArrowLeft size={18} />
         </button>
 
-        {/* Header Title */}
         <div className="mb-10">
-          <h1 className="text-3xl font-black text-[#1e5297] tracking-tight">Create Competition</h1>
+          <h1 className="text-3xl font-black text-[#1e5297] tracking-tight">{isEditMode ? "Continue Editing Draft" : "Create Competition"}</h1>
           <p className="text-gray-400 text-xs font-semibold mt-2">Here you can make your own competition. Make sure to give out all of the necessary information and criteria</p>
         </div>
 
-        {/* FORM CONTAINER */}
-        <form className="space-y-8 text-gray-700">
-          {/* Row 1: Competition Name & Category */}
+        <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-8 text-gray-700">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400">Competition Name</label>
+              <label className="text-xs font-bold text-gray-400">
+                Competition Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                required
                 placeholder="Enter your competition name..."
-                className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl px-5 py-3.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all"
+                className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl px-5 py-3.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400">Category</label>
-              <input
-                type="text"
-                placeholder="Enter your competition category..."
-                className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl px-5 py-3.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all"
-              />
+              <label className="text-xs font-bold text-gray-400">
+                Category <span className="text-red-500">*</span>
+              </label>
+              <div className="relative group">
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl px-5 pr-12 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all text-gray-700 appearance-none cursor-pointer"
+                >
+                  <option value="" disabled hidden>
+                    Select your category...
+                  </option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-transform group-focus-within:rotate-180 duration-200" size={16} />
+              </div>
             </div>
           </div>
 
-          {/* Row 2: Description */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400">Description</label>
+            <label className="text-xs font-bold text-gray-400">
+              Description <span className="text-red-500">*</span>
+            </label>
             <textarea
               rows={5}
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              required
               placeholder="What's the competition about? Explain it here..."
-              className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl px-5 py-4 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all resize-none"
+              className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl px-5 py-4 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all resize-none"
             />
           </div>
 
-          {/* Row 3: Rules & Guidelines (Dynamic List) */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-400 block">Rules & Guidelines</label>
             <div className="bg-gray-100/70 border border-gray-200/50 rounded-2xl p-5 space-y-3">
               {rules.map((rule, idx) => (
-                <div key={idx} className="flex items-center gap-3">
+                <div key={idx} className="flex items-center gap-3 group">
                   <span className="text-xs font-bold text-gray-400 min-w-[15px]">{idx + 1}.</span>
                   <input
                     type="text"
@@ -96,6 +269,9 @@ export default function Main() {
                     placeholder={idx === 0 ? "Write your competition rules & guidelines..." : "Add more guidelines..."}
                     className="w-full bg-transparent border-none text-sm placeholder-gray-400 focus:outline-none"
                   />
+                  <button type="button" onClick={() => removeRule(idx)} className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-md outline-none cursor-pointer" title="Delete rule">
+                    <X size={14} />
+                  </button>
                 </div>
               ))}
               <button type="button" onClick={addRule} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors mt-2 cursor-pointer outline-none">
@@ -104,43 +280,38 @@ export default function Main() {
             </div>
           </div>
 
-          {/* Row 4: Schedule (Dynamic Rows) */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-gray-400 block">Schedule</label>
             <div className="bg-gray-100/70 border border-gray-200/50 rounded-2xl p-5 space-y-4">
               {schedules.map((sched, idx) => (
-                <div key={idx} className="flex flex-col md:flex-row items-center gap-4 border-b border-gray-200/50 pb-4 md:pb-0 md:border-none last:border-none last:pb-0">
+                <div key={idx} className="flex flex-col md:flex-row items-center gap-4 border-b border-gray-200/50 pb-4 md:pb-0 md:border-none last:border-none last:pb-0 group relative">
                   <input
                     type="text"
-                    value={sched.activity}
-                    onChange={(e) => handleScheduleChange(idx, "activity", e.target.value)}
-                    placeholder="Write your competition activity..."
-                    className="w-full md:flex-1 bg-transparent border-none text-sm placeholder-gray-400 focus:outline-none py-1"
+                    value={sched.event}
+                    onChange={(e) => handleScheduleChange(idx, "event", e.target.value)}
+                    placeholder="Write your competition activity (e.g., Registration Open)..."
+                    className="w-full md:flex-1 bg-transparent border-none text-sm placeholder-gray-400 focus:outline-none py-1 font-medium"
                   />
 
-                  <div className="flex gap-2 w-full md:w-auto justify-end">
-                    {/* Time Picker */}
-                    <div className="flex items-center gap-2 bg-white/80 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm text-xs font-medium text-gray-500">
-                      <Clock size={14} className="text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Time"
-                        value={sched.time}
-                        onChange={(e) => handleScheduleChange(idx, "time", e.target.value)}
-                        className="w-12 bg-transparent text-center focus:outline-none"
-                      />
-                    </div>
-                    {/* Date Picker */}
-                    <div className="flex items-center gap-2 bg-white/80 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm text-xs font-medium text-gray-500">
+                  <div className="flex gap-2 w-full md:w-auto justify-end items-center">
+                    <div className="flex items-center gap-2 bg-white/80 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm text-xs font-medium text-gray-500 focus-within:ring-2 focus-within:ring-[#8cabd9]/50 transition-all">
                       <Calendar size={14} className="text-gray-400" />
                       <input
-                        type="text"
-                        placeholder="dd/mm/yyyy"
+                        type="date"
                         value={sched.date}
                         onChange={(e) => handleScheduleChange(idx, "date", e.target.value)}
-                        className="w-20 bg-transparent text-center focus:outline-none"
+                        required={!!sched.event}
+                        className="bg-transparent focus:outline-none text-gray-700 font-sans cursor-pointer accent-[#8cabd9]"
                       />
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSchedule(idx)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-md outline-none cursor-pointer ml-1"
+                      title="Delete schedule"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -150,83 +321,117 @@ export default function Main() {
             </div>
           </div>
 
-          {/* Row 5: Tiga Kolom (Period, Prize, Participant) */}
-          {/* Menggunakan `mb-8` agar baris tiga kolom ini memberikan jarak vertikal ekstra ke form di bawahnya */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400">Competition Period</label>
+              <label className="text-xs font-bold text-gray-400">
+                Start Date <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
-                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
                 <input
-                  type="text"
-                  placeholder="dd/mm/yyyy - dd/mm/yyyy"
-                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all"
+                  type="date"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all text-gray-700 accent-[#8cabd9]"
                 />
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400">
+                End Date <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                <input
+                  type="date"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleInputChange}
+                  required
+                  min={formData.startDate}
+                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all text-gray-700 accent-[#8cabd9]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-400">Competition Prize</label>
               <div className="relative">
                 <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
+                  name="prize"
+                  value={formData.prize}
+                  onChange={handleInputChange}
                   placeholder="Rp..."
-                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all"
+                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400">Maximum Participant</label>
-              <div className="relative">
-                <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="Max..."
-                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all"
-                />
+              <label className="text-xs font-bold text-gray-400">
+                Competition Type <span className="text-red-500">*</span>
+              </label>
+              <div className="relative group">
+                <Layers className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                <select
+                  name="competitionType"
+                  value={formData.competitionType}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-12 py-3.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all text-gray-700 appearance-none cursor-pointer"
+                >
+                  {competitionTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-transform group-focus-within:rotate-180 duration-200" size={16} />
               </div>
             </div>
           </div>
 
-          {/* Row 6: Cover Image URL */}
-          {/* Ditambahkan `pt-2` atau otomatis terpisah berkat space-y-8 pada form */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400">Cover Image URL</label>
-            <div className="relative">
-              <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <input
-                type="url"
-                placeholder="Enter your URL..."
-                className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Row 7: Registration Link */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400">Registration Link</label>
+            <label className="text-xs font-bold text-gray-400">
+              Registration Link <span className="text-red-500">*</span>
+            </label>
             <div className="relative">
               <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
                 type="url"
+                name="registrationLink"
+                value={formData.registrationLink}
+                onChange={handleInputChange}
+                required
                 placeholder="Enter your URL..."
-                className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8cabd9]/50 transition-all"
+                className="w-full bg-gray-100/70 border border-gray-200/50 rounded-2xl pl-12 pr-4 py-3.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-#8cabd9/50 transition-all"
               />
             </div>
           </div>
 
-          {/* ACTION BUTTONS SECTION */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
             <button
               type="button"
-              className="w-full py-4 bg-white hover:bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-500 shadow-sm transition-all cursor-pointer outline-none"
+              disabled={isSubmitting}
+              onClick={(e) => handleSubmit(e as any, true)}
+              className="w-full py-4 bg-white hover:bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-500 shadow-sm transition-all cursor-pointer outline-none flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              Save as Draft
+              {isEditMode ? "Update Draft" : "Save as Draft"}
             </button>
-            <button type="submit" className="w-full py-4 bg-[#8cabd9] hover:bg-[#365D92] text-white rounded-2xl text-xs font-bold shadow-sm transition-all cursor-pointer outline-none">
-              Create Competition
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-4 bg-[#8cabd9] hover:bg-[#365D92] text-white rounded-2xl text-xs font-bold shadow-sm transition-all cursor-pointer outline-none flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              {isEditMode ? "Publish Competition" : "Create Competition"}
             </button>
           </div>
         </form>

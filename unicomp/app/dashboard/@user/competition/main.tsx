@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { Search } from "lucide-react";
 
@@ -9,8 +8,9 @@ interface Competition {
   title: string;
   description: string;
   category: string;
+  competition_type: string;
   deadline: string;
-  schedule: string;
+  schedule: Record<string, string> | null;
   start_date: string;
   end_date: string;
   registration_link: string;
@@ -31,6 +31,7 @@ export default function Main() {
 
   const formatDate = (dateString: string) => {
     try {
+      if (!dateString) return "-";
       const date = new Date(dateString);
       const day = String(date.getDate()).padStart(2, "0");
       const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -57,7 +58,7 @@ export default function Main() {
         if (response.ok) {
           const data: Competition[] = await response.json();
 
-          // Jika tidak termasuk ke data ini, maka dilabel "others"
+          // Menormalisasi kategori agar pas dengan tombol filter statis
           const normalizedData = data.map((comp) => {
             const isMainCategory = ["hackathon", "data science", "design", "cybersecurity"].includes(comp.category.toLowerCase());
             return {
@@ -81,8 +82,7 @@ export default function Main() {
     fetchCompetitions();
   }, []);
 
-  // Search Button
-  // Filter Logic berdasarkan kategori (termasuk Others) dan input pencarian
+  // Filter Logic berdasarkan kategori dan input pencarian
   useEffect(() => {
     let result = competitions;
 
@@ -148,7 +148,8 @@ export default function Main() {
                 {/* Blue Top Section */}
                 <div className="bg-[#1e5297] p-6 h-32 relative flex items-start justify-between">
                   <span className="bg-white text-[#1e5297] text-xs font-extrabold px-3 py-1.5 rounded-lg shadow-sm">{comp.category}</span>
-                  <span className="bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-lg backdrop-blur-sm">{comp.schedule}</span>
+                  {/* Diubah dari comp.schedule menjadi comp.competition_type */}
+                  <span className="bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-lg backdrop-blur-sm">{comp.competition_type}</span>
                 </div>
 
                 {/* Card Body */}
@@ -159,7 +160,7 @@ export default function Main() {
 
                     <div className="mt-4 space-y-1 text-xs text-gray-500 font-semibold">
                       <p>
-                        Schedule:{" "}
+                        Timeline:{" "}
                         <span className="text-gray-700">
                           {formatDate(comp.start_date)} - {formatDate(comp.end_date)}
                         </span>

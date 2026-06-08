@@ -4,10 +4,12 @@ import Main from "./main";
 
 export default function OrganizerDashboard() {
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <OrganizerHeader />
-      <Main />
+      <div className="flex-1">
+        <Main />
+      </div>
       <Footer />
-    </>
+    </div>
   );
 }

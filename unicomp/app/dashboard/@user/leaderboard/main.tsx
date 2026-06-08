@@ -1,27 +1,26 @@
 "use client";
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Search, ArrowDown, ChevronDown } from "lucide-react";
+import { Search, ArrowDown, ChevronDown, Loader2 } from "lucide-react";
 
-// Mock Data
-const INITIAL_PARTICIPANTS = [
-  { id: 1, name: "Clement Ernest Atmadja", university: "BINUS University", wins: 12, registered: 15, category: "Hackathon" },
-  { id: 2, name: "Albert Christian Yang", university: "BINUS University", wins: 10, registered: 14, category: "Data Science" },
-  { id: 3, name: "Vittorio Dinata", university: "BINUS University", wins: 9, registered: 12, category: "Design" },
-  { id: 4, name: "Alvaro Chandra", university: "BINUS University", wins: 8, registered: 11, category: "Cybersecurity" },
-  { id: 5, name: "John Son", university: "BINUS University", wins: 7, registered: 13, category: "Others" },
-  { id: 6, name: "John Harley David Son", university: "BINUS University", wins: 6, registered: 9, category: "Hackathon" },
-  { id: 7, name: "John Sonflower", university: "BINUS University", wins: 5, registered: 10, category: "Data Science" },
-  { id: 8, name: "John Sony", university: "BINUS University", wins: 4, registered: 7, category: "Design" },
-  { id: 9, name: "John Daughter", university: "BINUS University", wins: 3, registered: 8, category: "Cybersecurity" },
-  { id: 10, name: "John Sonbrero", university: "BINUS University", wins: 2, registered: 6, category: "Others" },
-  { id: 11, name: "Alice Wijaya", university: "UI", wins: 2, registered: 5, category: "Hackathon" },
-  { id: 12, name: "Michael Owen", university: "ITB", wins: 1, registered: 4, category: "Data Science" },
-];
+// Definisikan Interface sesuai dengan output objek API Anda
+interface Participant {
+  rank: number;
+  user_id: string;
+  name: string;
+  email: string;
+  campus_name: string | null;
+  semester: number | null;
+  total_registrations: number;
+  total_wins: number;
+  wins_by_category: Record<string, number>;
+}
 
 type FilterType = "all" | "wins" | "registered";
 type CategoryType = "All" | "Hackathon" | "Data Science" | "Design" | "Cybersecurity" | "Others";
 
 export default function LeaderboardPage() {
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [activeCategory, setActiveCategory] = useState<CategoryType>("All");
@@ -30,6 +29,28 @@ export default function LeaderboardPage() {
   const itemsPerPage = 10;
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchLeaderboardData = async () => {
+      try {
+        setIsLoading(true);
+        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+
+        // Sesuaikan endpoint leaderboard ini dengan rute backend Anda
+        const response = await fetch(`${apiUrl}/users/leaderboard`);
+        if (!response.ok) throw new Error("Failed to fetch leaderboard statistics");
+
+        const data: Participant[] = await response.json();
+        setParticipants(data);
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLeaderboardData();
+  }, []);
 
   // Fungsi menutup dropdown otomatis ketika klik di luar komponen area filter
   useEffect(() => {
@@ -42,31 +63,35 @@ export default function LeaderboardPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- LOGIKA FILTER & SEARCH ---
+  // --- LOGIKA FILTER, SEARCH, & SORTING DINAMIS ---
   const processedParticipants = useMemo(() => {
-    let result = [...INITIAL_PARTICIPANTS];
+    let result = [...participants];
 
-    // Logika 1: Pencarian berdasarkan Nama
+    // Logika 1: Pencarian berdasarkan Nama pengguna
     if (searchQuery.trim() !== "") {
       result = result.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
-    // Logika 2: Saring data kumulatif dari pilihan Category Dropdown
+    // Logika 2: Saring data berdasarkan Category Dropdown (Mengecek kunci objek wins_by_category)
     if (activeCategory !== "All") {
-      result = result.filter((p) => p.category === activeCategory);
+      result = result.filter((p) => {
+        // Memeriksa jika user memiliki record kemenangan di kategori yang dipilih (> 0)
+        return p.wins_by_category && p.wins_by_category[activeCategory] > 0;
+      });
     }
 
     // Logika 3: Pengurutan Utama Berdasarkan Tab Utama Aktif
     if (activeFilter === "wins") {
-      result.sort((a, b) => b.wins - a.wins);
+      result.sort((a, b) => b.total_wins - a.total_wins);
     } else if (activeFilter === "registered") {
-      result.sort((a, b) => b.registered - a.registered);
+      result.sort((a, b) => b.total_registrations - a.total_registrations);
     } else {
-      result.sort((a, b) => a.id - b.id);
+      // Default: Urutkan berdasarkan rank bawaan ID pengguna
+      result.sort((a, b) => a.rank - b.rank);
     }
 
     return result;
-  }, [searchQuery, activeFilter, activeCategory]);
+  }, [participants, searchQuery, activeFilter, activeCategory]);
 
   // --- LOGIKA PAGINATION ---
   const totalPages = Math.ceil(processedParticipants.length / itemsPerPage) || 1;
@@ -96,7 +121,7 @@ export default function LeaderboardPage() {
 
   return (
     <div className="bg-[#f3f4f6] min-h-screen pb-16 font-sans">
-      <div className="max-w-6l mx-auto px-8 md:px-16 pt-10">
+      <div className="max-w-6xl mx-auto px-8 md:px-16 pt-10">
         {/* Title Section */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-[#1e40af]">Leaderboard</h1>
@@ -200,11 +225,17 @@ export default function LeaderboardPage() {
         {/* Leaderboard Table Box Container */}
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
           <div className="divide-y divide-gray-100">
-            {currentData.length > 0 ? (
+            {isLoading ? (
+              // Tampilan state loading spinner
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Loader2 className="animate-spin text-[#1e40af] w-10 h-10" />
+                <p className="text-gray-400 font-bold text-sm">Loading leaderboard rankings...</p>
+              </div>
+            ) : currentData.length > 0 ? (
               currentData.map((participant, index) => {
                 const globalRank = (currentPage - 1) * itemsPerPage + index + 1;
                 return (
-                  <div key={participant.id} className="flex items-center gap-5 py-4 first:pt-0 last:pb-0 hover:bg-gray-50/70 transition-all px-3 -mx-3 rounded-xl group">
+                  <div key={participant.user_id} className="flex items-center gap-5 py-4 first:pt-0 last:pb-0 hover:bg-gray-50/70 transition-all px-3 -mx-3 rounded-xl group">
                     {/* Rank Circle Badge */}
                     <div
                       className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-sm transition-transform duration-200 group-hover:scale-105 ${getRankBadgeStyles(index)}`}
@@ -216,17 +247,21 @@ export default function LeaderboardPage() {
                     <div className="flex-1">
                       <div className="font-bold text-gray-800 text-sm tracking-wide transition-colors group-hover:text-blue-600">{participant.name}</div>
                       <div className="text-[11px] text-gray-400 font-medium mt-0.5 flex items-center gap-2">
-                        <span>{participant.university}</span>
-                        <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
-                        <span className="text-gray-400/70 italic font-normal">{participant.category}</span>
+                        <span>{participant.campus_name || "No Campus / Public"}</span>
+                        {participant.semester && (
+                          <>
+                            <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                            <span className="text-gray-400/70 italic font-normal">Semester {participant.semester}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    {/* Menampilkan value pendukung jika filter aktif */}
+                    {/* Menampilkan value data dinamis berdasarkan tab filter aktif */}
                     <div className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full transition-colors group-hover:bg-blue-100 shrink-0">
-                      {activeFilter === "wins" && `${participant.wins} Wins`}
-                      {activeFilter === "registered" && `${participant.registered} Registered`}
-                      {activeFilter === "all" && `${participant.wins}W / ${participant.registered}R`}
+                      {activeFilter === "wins" && `${participant.total_wins} Wins`}
+                      {activeFilter === "registered" && `${participant.total_registrations} Registered`}
+                      {activeFilter === "all" && `${participant.total_wins}W / ${participant.total_registrations}R`}
                     </div>
                   </div>
                 );
@@ -237,36 +272,38 @@ export default function LeaderboardPage() {
           </div>
 
           {/* Footer Controls Component */}
-          <div className="flex items-center justify-end gap-5 mt-8 pt-4 border-t border-gray-100 text-xs text-gray-400 font-medium">
-            <div>
-              Show {currentPage} of {totalPages}
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handlePrevPage}
-                disabled={currentPage === 1}
-                className={`p-1.5 rounded-lg border transition-all transform active:scale-90 cursor-pointer ${
-                  currentPage === 1 ? "border-gray-100 text-gray-200 cursor-not-allowed" : "border-gray-200 text-blue-600 hover:bg-gray-50"
-                }`}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-              </button>
+          {!isLoading && (
+            <div className="flex items-center justify-end gap-5 mt-8 pt-4 border-t border-gray-100 text-xs text-gray-400 font-medium">
+              <div>
+                Show {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                  className={`p-1.5 rounded-lg border transition-all transform active:scale-90 cursor-pointer ${
+                    currentPage === 1 ? "border-gray-100 text-gray-200 cursor-not-allowed" : "border-gray-200 text-blue-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
 
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages}
-                className={`p-1.5 rounded-lg border transition-all transform active:scale-90 cursor-pointer ${
-                  currentPage === totalPages ? "border-gray-100 text-gray-200 cursor-not-allowed" : "border-gray-200 text-blue-600 hover:bg-gray-50"
-                }`}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-              </button>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`p-1.5 rounded-lg border transition-all transform active:scale-90 cursor-pointer ${
+                    currentPage === totalPages ? "border-gray-100 text-gray-200 cursor-not-allowed" : "border-gray-200 text-blue-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,58 +1,128 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation"; // Menggunakan router Next.js untuk navigasi
+import { Loader2, AlertCircle } from "lucide-react";
+
+interface Competition {
+  competition_id: string;
+  title: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  organizer_id: string;
+}
 
 export default function Main() {
-  // Data mockup
-  const pendingCompetitions = [
-    {
-      id: "pending-1",
-      title: "ASYNCO COMPETITION",
-      badgeText: "PUBLISH APPROVAL",
-      timeline: "May 20, 2026 - May 31, 2026",
-    },
-    {
-      id: "pending-2",
-      title: "SAW-IT COMPETITION",
-      badgeText: "PUBLISH APPROVAL",
-      timeline: "May 21, 2026 - June 1, 2026",
-    },
-  ];
+  // State untuk data dari API, loading, dan error handling
+  const [draftList, setDraftList] = useState<Competition[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const router = useRouter(); // Inisialisasi router
+
+  useEffect(() => {
+    const fetchDraftCompetitions = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const token = localStorage.getItem("token");
+        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+
+        if (!token) throw new Error("Token autentikasi tidak ditemukan.");
+
+        // Langsung mengambil data dari endpoint submissions khusus milik organizer
+        const res = await fetch(`${apiUrl}/competitions/organizer/submissions`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error("Gagal mengambil data draft kompetisi.");
+        const data = await res.json();
+
+        // Mengambil array kompetisi dari properti 'draft.competitions'
+        const drafts = data.draft?.competitions || [];
+        setDraftList(drafts);
+      } catch (err: any) {
+        console.error("Error fetching draft competitions:", err);
+        setError(err.message || "Terjadi kesalahan saat memuat data draft.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDraftCompetitions();
+  }, []);
+
+  // Fungsi untuk mengarahkan user ke halaman edit berdasarkan ID kompetisi
+  const handleSelectDraft = (id: string) => {
+    router.push(`/dashboard/create-new-competition?edit=${id}`);
+  };
+
+  // Fungsi helper untuk memformat rentang waktu tanggal (ISO string -> readable format)
+  const formatTimeline = (start: string, end: string) => {
+    if (!start || !end) return "Timeline tidak tersedia";
+    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
+    const startDate = new Date(start).toLocaleDateString("en-US", options);
+    const endDate = new Date(end).toLocaleDateString("en-US", options);
+    return `${startDate} - ${endDate}`;
+  };
 
   return (
-    <div className="relative min-h-screen bg-[#f8f9fa] w-full">
+    <div className="relative h-auto md:min-h-[calc(100vh-180px)] w-full bg-[#f8f9fa] overflow-hidden flex flex-col justify-between">
       {/* BACKGROUND IMAGE OVERLAY */}
       <div className="absolute inset-0 w-full h-full opacity-5 pointer-events-none -z-10">
-        <Image src="/NetworkBG.svg" alt="Pending Approval Page Background" fill className="object-cover object-center" priority />
+        <Image src="/NetworkBG.svg" alt="Draft Page Background" fill className="object-cover object-center" priority />
       </div>
 
-      <main className="max-w-7xl w-full mx-auto px-6 md:px-12 py-12 font-sans">
-        {/* Title Header Section */}
+      {/* KONTEN UTAMA */}
+      <main className="max-w-7xl w-full mx-auto px-6 md:px-12 py-12 font-sans flex-1">
+        {/* Judul & Deskripsi Halaman */}
         <div className="mb-10">
-          <h1 className="text-4xl font-black text-[#1e5297] tracking-tight">Pending Approval</h1>
-          <p className="mt-2 text-gray-500 font-medium text-sm md:text-base">Here lies all of your competition that has been yet to be approved by administrator</p>
+          <h1 className="text-4xl font-black text-[#1e5297] tracking-tight">Draft</h1>
+          <p className="mt-2 text-gray-500 font-medium text-sm md:text-base">Here lies all of your saved draft. Make sure to continue edit them and send your competition</p>
         </div>
 
-        {/* List Cards Container */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-2 overflow-hidden">
-          {pendingCompetitions.map((item, index) => (
-            <div key={item.id}>
-              {/* Card Row */}
-              <div className="w-full p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white hover:bg-gray-50/50 transition-colors">
-                {/* Kiri: Judul Kompetisi & Badge */}
-                <div className="flex flex-wrap items-center gap-6">
-                  <h3 className="font-extrabold text-gray-700 text-base md:text-lg tracking-tight">{item.title}</h3>
-                  <span className="text-[9px] font-black tracking-wider text-[#ef4444] bg-[#ef4444]/10 px-3 py-1.5 rounded-md">{item.badgeText}</span>
+        {/* List Card Area */}
+        <div className="space-y-4">
+          {isLoading ? (
+            /* State Loading */
+            <div className="flex flex-col items-center justify-center gap-2 py-20 bg-white rounded-[2rem] border border-gray-100 shadow-sm text-gray-400 font-medium text-sm">
+              <Loader2 className="animate-spin text-[#8cabd9] w-8 h-8" />
+              Loading your drafts...
+            </div>
+          ) : error ? (
+            /* State Error */
+            <div className="flex flex-col items-center justify-center gap-2 py-20 bg-white rounded-[2rem] border border-gray-100 shadow-sm text-red-500 font-medium text-sm">
+              <AlertCircle className="w-8 h-8" />
+              {error}
+            </div>
+          ) : draftList.length === 0 ? (
+            /* State Jika Data Kosong */
+            <div className="text-center py-20 bg-white/50 rounded-[2rem] border border-dashed border-gray-300 text-gray-400 font-bold">No drafts found.</div>
+          ) : (
+            /* State Menampilkan List Data Asli */
+            draftList.map((item) => (
+              <div
+                key={item.competition_id}
+                onClick={() => handleSelectDraft(item.competition_id)} // Aksi klik memicu perpindahan URL
+                className="w-full bg-white rounded-[2rem] border border-gray-100 p-8 md:p-10 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 hover:shadow-md transition-all cursor-pointer group"
+              >
+                {/* Sisi Kiri: Judul Kompetisi */}
+                <div className="flex items-center">
+                  <h3 className="font-extrabold text-gray-700 text-lg md:text-xl tracking-tight group-hover:text-[#1e5297] transition-colors uppercase">{item.title}</h3>
                 </div>
 
-                {/* Kanan: Tanggal Durasi */}
-                <div className="text-gray-800 font-bold text-sm md:text-base tracking-tight whitespace-nowrap">{item.timeline}</div>
+                {/* Sisi Rencana Kanan: Rentang Waktu */}
+                <div className="text-gray-800 font-bold text-sm md:text-lg tracking-tight bg-gray-50 sm:bg-transparent px-4 py-2 sm:p-0 rounded-xl">
+                  {formatTimeline(item.start_date, item.end_date)}
+                </div>
               </div>
-
-              {/* Garis Pembatas Tipis Antar Baris */}
-              {index < pendingCompetitions.length - 1 && <div className="h-px bg-gray-100 mx-6 md:mx-8"></div>}
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </main>
     </div>

@@ -35,6 +35,8 @@ export default function UserHeader() {
         const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
         const token = localStorage.getItem("token");
 
+        if (!apiUrl) return;
+
         const res = await fetch(`${apiUrl}/notifications/me`, {
           method: "GET",
           headers: {
@@ -46,8 +48,15 @@ export default function UserHeader() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            // Cek jika ada minimal satu notifikasi yang belum dibaca
-            const unreadExist = data.some((n: any) => n.is_read === false || n.status === "unread" || !n.is_read);
+            // Logika diperketat: Hanya bernilai TRUE jika ada objek yang statusnya UNREAD secara eksplisit
+            const unreadExist = data.some((n: any) => {
+              // Menangani struktur data fleksibel (boolean `is_read` atau string `status`)
+              const isUnreadByFlag = n.is_read === false;
+              const isUnreadByStatus = String(n.status).toUpperCase() === "UNREAD";
+
+              return isUnreadByFlag || isUnreadByStatus;
+            });
+
             setHasUnread(unreadExist);
           }
         }
@@ -112,7 +121,7 @@ export default function UserHeader() {
             <Link href="/dashboard/notifications" className="text-[#1e40af] hover:text-white transition-colors relative">
               <Bell size={24} strokeWidth={2} className="md:w-[28px] md:h-[28px]" />
 
-              {/* TANDA MERAH AKTIF JIKA ADA UNREAD */}
+              {/* TANDA MERAH AKTIF HANYA JIKA ADA UNREAD */}
               {hasUnread && <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full border-2 border-[#8cabd9] animate-pulse"></span>}
             </Link>
 
