@@ -21,7 +21,7 @@ export default function Main() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   useEffect(() => {
     const fetchAndFilterCompetitions = async () => {

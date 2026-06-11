@@ -33,7 +33,7 @@ export default function Main() {
         setIsLoading(true);
         setError(null);
         const token = localStorage.getItem("token");
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
         const res = await fetch(`${apiUrl}/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -61,7 +61,7 @@ export default function Main() {
     try {
       setIsSaving(true);
       const token = localStorage.getItem("token");
-      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
       // Konstruksi payload agar sesuai dengan format yang diminta oleh dokumentasi API
       const payload = {

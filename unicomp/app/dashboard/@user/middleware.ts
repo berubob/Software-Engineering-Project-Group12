@@ -28,7 +28,7 @@ export function useDashboard() {
   const [activeCount, setActiveCount] = useState<number>(0);
   const [deadlineCount, setDeadlineCount] = useState<number>(0);
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   const fetchNotifications = async () => {
     try {

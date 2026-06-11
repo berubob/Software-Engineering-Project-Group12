@@ -34,7 +34,7 @@ export default function LeaderboardPage() {
     const fetchLeaderboardData = async () => {
       try {
         setIsLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
         // Sesuaikan endpoint leaderboard ini dengan rute backend Anda
         const response = await fetch(`${apiUrl}/users/leaderboard`);

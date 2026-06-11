@@ -14,7 +14,7 @@ export default function Main() {
       try {
         setIsLoading(true);
         const token = localStorage.getItem("token");
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
         if (!token || !apiUrl) return;
 

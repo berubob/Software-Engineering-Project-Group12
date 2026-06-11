@@ -46,7 +46,7 @@ export default function Main() {
     const fetchCompetitions = async () => {
       try {
         setLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
         const response = await fetch(`${apiUrl}/competitions`, {
           method: "GET",

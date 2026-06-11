@@ -22,7 +22,7 @@ export default function Main() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Endpoint API Backend Railway Anda
-  const RAILWAY_API_URL = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const RAILWAY_API_URL = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   useEffect(() => {
     const fetchDeadlines = async () => {

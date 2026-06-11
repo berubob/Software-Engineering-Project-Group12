@@ -14,7 +14,7 @@ export default function Main() {
   const [competitionResults, setCompetitionResults] = useState<CompetitionResultItem[]>([]);
   const [loadingResults, setLoadingResults] = useState<boolean>(true);
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   useEffect(() => {
     const fetchResultsData = async () => {

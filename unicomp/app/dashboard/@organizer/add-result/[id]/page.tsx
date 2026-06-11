@@ -58,7 +58,7 @@ export default function AddResult() {
         setIsLoading(true);
         setError(null);
         const token = localStorage.getItem("token");
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
         // 1. Fetch Informasi Detail Kompetisi
         const compRes = await fetch(`${apiUrl}/competitions/${id}`, {
@@ -233,7 +233,7 @@ export default function AddResult() {
     try {
       setIsSubmitting(true);
       const token = localStorage.getItem("token");
-      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
       if (winners.length === 0) {
         throw new Error("Tidak ada data peserta terdaftar yang dapat dinilai.");

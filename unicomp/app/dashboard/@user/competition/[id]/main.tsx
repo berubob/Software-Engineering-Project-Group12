@@ -32,7 +32,7 @@ export default function Main() {
   const [registerLoading, setRegisterLoading] = useState<boolean>(false);
   const [registerStatus, setRegisterStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   useEffect(() => {
     const fetchCompetitionAndOrganizer = async () => {

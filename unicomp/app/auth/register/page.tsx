@@ -39,7 +39,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
       const response = await fetch(`${apiUrl}/auth/register`, {
         method: "POST",

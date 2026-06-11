@@ -22,7 +22,7 @@ export default function Main() {
   const [isApprovingAll, setIsApprovingAll] = useState<boolean>(false);
 
   const categories = ["All", "Hackathon", "Data Science", "Design", "Cybersecurity", "Others"];
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   // 1. Ambil data pending & perkaya data organizer dari /competitions/[id]
   const fetchPendingCompetitions = async () => {

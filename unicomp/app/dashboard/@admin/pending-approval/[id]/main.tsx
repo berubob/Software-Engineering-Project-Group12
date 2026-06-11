@@ -27,7 +27,7 @@ export default function Main() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   // 1. Ambil data detail kompetisi berdasarkan ID
   useEffect(() => {

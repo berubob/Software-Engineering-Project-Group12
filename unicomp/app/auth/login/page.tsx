@@ -32,7 +32,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
       const response = await fetch(`${apiUrl}/auth/login`, {
         method: "POST",

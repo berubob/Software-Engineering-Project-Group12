@@ -16,7 +16,7 @@ export default function AdminHeader() {
     role: "Participant",
   });
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   // 1. Ambil data user dari localStorage & Cek Notifikasi
   useEffect(() => {

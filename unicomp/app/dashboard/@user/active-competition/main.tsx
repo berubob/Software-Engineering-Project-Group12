@@ -22,7 +22,7 @@ export default function Main() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const RAILWAY_API_URL = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const RAILWAY_API_URL = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   useEffect(() => {
     const fetchCompetitions = async () => {

@@ -27,7 +27,7 @@ export default function Main() {
         setIsLoading(true);
         setError(null);
         const token = localStorage.getItem("token");
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
         if (!token) throw new Error("Token autentikasi tidak ditemukan.");
 

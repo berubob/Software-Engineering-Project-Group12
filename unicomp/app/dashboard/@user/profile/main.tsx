@@ -51,7 +51,7 @@ export default function Main() {
     about_me: "",
   });
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   const fetchProfileData = async () => {
     try {

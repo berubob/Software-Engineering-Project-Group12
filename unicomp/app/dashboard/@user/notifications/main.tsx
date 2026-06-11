@@ -15,7 +15,7 @@ export default function Main() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isMarkingRead, setIsMarkingRead] = useState<boolean>(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   const fetchNotifications = async () => {
     try {

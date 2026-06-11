@@ -65,7 +65,7 @@ export default function Main() {
 
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
   useEffect(() => {
     localStorage.setItem("admin_active_tab", activeTab);

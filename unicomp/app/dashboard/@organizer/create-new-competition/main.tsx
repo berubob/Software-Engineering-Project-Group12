@@ -125,7 +125,7 @@ export default function Main() {
     try {
       setIsSubmitting(true);
       const token = localStorage.getItem("token");
-      const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
 
       const apiScheduleObject: Record<string, string> = {};
       schedules.forEach((item) => {

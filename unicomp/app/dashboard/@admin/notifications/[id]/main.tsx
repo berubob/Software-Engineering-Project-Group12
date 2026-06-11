@@ -25,7 +25,7 @@ export default function NotificationDetailMain() {
         setLoading(true);
         setError(null);
 
-        const apiUrl = process.env.NEXT_PUBLIC_RAILWAY_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
         const token = localStorage.getItem("token");
 
         const res = await fetch(`${apiUrl}/notifications/me`, {
